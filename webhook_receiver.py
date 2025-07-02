@@ -44,7 +44,8 @@ def get_supabase_connection():
         return None
 
 # --- Function to Save Note to Supabase (Unified for all inputs) ---
-def save_note_to_database(content, summary, sentiment, keywords, username): # Added 'username' parameter
+# IMPORTANT: Added 'username' parameter here
+def save_note_to_database(content, summary, sentiment, keywords, username):
     """Saves processed note data to the Supabase database."""
     conn = get_supabase_connection()
     if conn is None:
@@ -59,20 +60,25 @@ def save_note_to_database(content, summary, sentiment, keywords, username): # Ad
             f'"{k.replace("\"", "\\\"")}"' for k in keywords
         ]) + '}'
 
+        # IMPORTANT: Added 'username' and 'timestamp' columns to the INSERT query
         insert_query = """
-        INSERT INTO user_notes (content, summary, sentiment, keywords, username, timestamp) # Added 'username' and 'timestamp'
-        VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP) # Added %s for username, and CURRENT_TIMESTAMP
+        INSERT INTO user_notes (content, summary, sentiment, keywords, username, timestamp)
+        VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
         RETURNING id;
         """
-        # Pass 'username' as a parameter here
+        # IMPORTANT: Passed 'username' as a parameter here
         cur.execute(insert_query, (content, summary, sentiment, keywords_pg_array, username))
         inserted_id = cur.fetchone()[0]
         conn.commit()
         print(f"--- Note successfully saved to Supabase with ID: {inserted_id} for user: {username} ---")
         return True
-    except Exception as e:
+    except psycopg2.Error as db_error: # Catch specific database errors for better debugging
         conn.rollback()
-        print(f"ERROR: Failed to save note to Supabase: {e}")
+        print(f"DATABASE ERROR during save_note_to_database: {db_error.pgcode} - {db_error.pgerror}")
+        return False
+    except Exception as e: # Catch any other Python errors
+        conn.rollback()
+        print(f"OTHER ERROR during save_note_to_database: {e}")
         return False
     finally:
         if conn:
@@ -162,7 +168,7 @@ def sms_webhook():
     # Use the sender_number as the username for this note
     username_for_note = sender_number
 
-    # Save to Supabase
+    # IMPORTANT: Passed username_for_note to save_note_to_database
     if save_note_to_database(message_body, summary, sentiment, keywords, username_for_note):
         response_msg = "Your SMS note has been processed and saved to Micro-Atlas! 🧠"
         print(response_msg)
@@ -186,12 +192,12 @@ def web_clip_webhook():
     data = request.get_json()
     clipped_url = data.get('url')
     clipped_text = data.get('text')
-    username_for_note = data.get('username') # <--- ADD THIS LINE: Extract username from JSON
+    username_for_note = data.get('username') # IMPORTANT: Extract username from JSON payload
 
-    # Add a check for username, or set a default if it's optional
+    # Optional: Add robustness if username might be missing from payload
     if not username_for_note:
         print("WARNING: 'username' not provided in web clip data. Using 'unknown_web_clipper' as default.")
-        username_for_note = 'unknown_web_clipper' # <--- CONSIDER ADDING THIS for robustness
+        username_for_note = 'unknown_web_clipper'
 
 
     if not clipped_url or not clipped_text.strip():
@@ -208,8 +214,8 @@ def web_clip_webhook():
     raw_keywords_response = get_ai_analysis(full_content, 'keywords')
     keywords = parse_keywords_response(raw_keywords_response)
 
-    # Save to Supabase
-    if save_note_to_database(full_content, summary, sentiment, keywords, username_for_note): # <--- CHANGE THIS LINE
+    # IMPORTANT: Passed username_for_note to save_note_to_database
+    if save_note_to_database(full_content, summary, sentiment, keywords, username_for_note):
         print("Web clip successfully processed and saved to Supabase.")
         return jsonify({"message": "Web clip received and saved!"}), 200
     else:
@@ -242,10 +248,7 @@ def receive_email():
     raw_keywords_response = get_ai_analysis(full_content, 'keywords')
     keywords = parse_keywords_response(raw_keywords_response)
 
-    # Use the sender's email as the username for this note
-    username_for_note = sender
-
-    # Save to Supabase
+    # IMPORTANT: Passed sender to save_note_to_database
     if save_note_to_database(full_content, summary, sentiment, keywords, sender):
         print("Email successfully processed and saved to Supabase.")
         return "Email received and saved!", 200
