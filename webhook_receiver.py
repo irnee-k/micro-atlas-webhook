@@ -44,7 +44,7 @@ def get_supabase_connection():
         return None
 
 # --- Function to Save Note to Supabase (Unified for all inputs) ---
-def save_note_to_database(content, summary, sentiment, keywords):
+def save_note_to_database(content, summary, sentiment, keywords, username): # Added 'username' parameter
     """Saves processed note data to the Supabase database."""
     conn = get_supabase_connection()
     if conn is None:
@@ -60,14 +60,15 @@ def save_note_to_database(content, summary, sentiment, keywords):
         ]) + '}'
 
         insert_query = """
-        INSERT INTO user_notes (content, summary, sentiment, keywords)
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO user_notes (content, summary, sentiment, keywords, username, timestamp) # Added 'username' and 'timestamp'
+        VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP) # Added %s for username, and CURRENT_TIMESTAMP
         RETURNING id;
         """
-        cur.execute(insert_query, (content, summary, sentiment, keywords_pg_array))
+        # Pass 'username' as a parameter here
+        cur.execute(insert_query, (content, summary, sentiment, keywords_pg_array, username))
         inserted_id = cur.fetchone()[0]
         conn.commit()
-        print(f"--- Note successfully saved to Supabase with ID: {inserted_id} ---")
+        print(f"--- Note successfully saved to Supabase with ID: {inserted_id} for user: {username} ---")
         return True
     except Exception as e:
         conn.rollback()
@@ -158,8 +159,11 @@ def sms_webhook():
     raw_keywords_response = get_ai_analysis(message_body, 'keywords')
     keywords = parse_keywords_response(raw_keywords_response)
 
+    # Use the sender_number as the username for this note
+    username_for_note = sender_number
+
     # Save to Supabase
-    if save_note_to_database(message_body, summary, sentiment, keywords):
+    if save_note_to_database(message_body, summary, sentiment, keywords, username_for_note):
         response_msg = "Your SMS note has been processed and saved to Micro-Atlas! 🧠"
         print(response_msg)
         twilio_response = MessagingResponse()
@@ -230,6 +234,9 @@ def receive_email():
     sentiment = get_ai_analysis(full_content, 'sentiment')
     raw_keywords_response = get_ai_analysis(full_content, 'keywords')
     keywords = parse_keywords_response(raw_keywords_response)
+
+    # Use the sender's email as the username for this note
+    username_for_note = sender
 
     # Save to Supabase
     if save_note_to_database(full_content, summary, sentiment, keywords):
