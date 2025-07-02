@@ -186,6 +186,13 @@ def web_clip_webhook():
     data = request.get_json()
     clipped_url = data.get('url')
     clipped_text = data.get('text')
+    username_for_note = data.get('username') # <--- ADD THIS LINE: Extract username from JSON
+
+    # Add a check for username, or set a default if it's optional
+    if not username_for_note:
+        print("WARNING: 'username' not provided in web clip data. Using 'unknown_web_clipper' as default.")
+        username_for_note = 'unknown_web_clipper' # <--- CONSIDER ADDING THIS for robustness
+
 
     if not clipped_url or not clipped_text.strip():
         print("ERROR: Missing 'url' or 'text' in web clip data.")
@@ -202,7 +209,7 @@ def web_clip_webhook():
     keywords = parse_keywords_response(raw_keywords_response)
 
     # Save to Supabase
-    if save_note_to_database(full_content, summary, sentiment, keywords):
+    if save_note_to_database(full_content, summary, sentiment, keywords, username_for_note): # <--- CHANGE THIS LINE
         print("Web clip successfully processed and saved to Supabase.")
         return jsonify({"message": "Web clip received and saved!"}), 200
     else:
@@ -239,7 +246,7 @@ def receive_email():
     username_for_note = sender
 
     # Save to Supabase
-    if save_note_to_database(full_content, summary, sentiment, keywords):
+    if save_note_to_database(full_content, summary, sentiment, keywords, sender):
         print("Email successfully processed and saved to Supabase.")
         return "Email received and saved!", 200
     else:
