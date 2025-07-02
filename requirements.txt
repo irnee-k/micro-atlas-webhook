@@ -3,5 +3,4 @@ psycopg2-binary
 openai
 python-dotenv
 twilio
-mailgun-sdk
 gunicorn
