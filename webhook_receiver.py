@@ -44,7 +44,7 @@ def get_supabase_connection():
         return None
 
 # --- Function to Save Note to Supabase (Unified for all inputs) ---
-# IMPORTANT: Added 'username' parameter here
+# IMPORTANT: 'username' parameter added here
 def save_note_to_database(content, summary, sentiment, keywords, username):
     """Saves processed note data to the Supabase database."""
     conn = get_supabase_connection()
@@ -60,13 +60,13 @@ def save_note_to_database(content, summary, sentiment, keywords, username):
             f'"{k.replace("\"", "\\\"")}"' for k in keywords
         ]) + '}'
 
-        # IMPORTANT: Added 'username' and 'timestamp' columns to the INSERT query
+        # IMPORTANT: 'username' and 'timestamp' columns included in the INSERT query
         insert_query = """
         INSERT INTO user_notes (content, summary, sentiment, keywords, username, timestamp)
         VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
         RETURNING id;
         """
-        # IMPORTANT: Passed 'username' as a parameter here
+        # IMPORTANT: 'username' value passed as a parameter here
         cur.execute(insert_query, (content, summary, sentiment, keywords_pg_array, username))
         inserted_id = cur.fetchone()[0]
         conn.commit()
